@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Address Book</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/weather-icons/2.0.12/css/weather-icons.min.css" rel="stylesheet">
+    <style>
+        .contact-card {
+            transition: transform 0.2s;
+        }
+        .contact-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .contact-avatar {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 50%;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+<!-- Navigation -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <div class="container">
+        <a class="navbar-brand" href="/">
+            <i class="fas fa-address-book me-2"></i>
+            Address Book
+        </a>
+        <div class="navbar-nav ms-auto" id="authNav">
+            <!-- This will be populated by JavaScript -->
+            <div class="d-flex align-items-center text-light">
+                <i class="fas fa-spinner fa-spin me-2"></i>
+                <span>Loading...</span>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<!-- Main Content -->
+<div class="container mt-4">
+    <!-- Header, Search, and Buttons -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 id="pageTitle">Address Book</h2>
+                <div>
+                    <button class="btn btn-success me-2" onclick="exportToCsv()">
+                        <i class="fas fa-file-export me-1"></i> Export CSV
+                    </button>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addContactModal">
+                        <i class="fas fa-plus me-1"></i> Add Contact
+                    </button>
+                </div>
+            </div>
+
+            <!-- Search Box -->
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="fas fa-search"></i>
+                    </span>
+                        <input type="text"
+                               class="form-control"
+                               id="searchInput"
+                               placeholder="Search contacts by name..."
+                               onkeyup="handleSearch()">
+                        <button class="btn btn-outline-secondary" type="button" onclick="clearSearch()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <span class="badge bg-secondary" id="searchResultsCount"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contacts Grid -->
+    <div class="row" id="contactsContainer">
+        <!-- Contacts will be loaded here dynamically -->
+        <div class="col-12">
+            <div class="empty-state" id="emptyState">
+                <i class="fas fa-address-book fa-3x mb-3"></i>
+                <h4>No contacts yet</h4>
+                <p>Get started by adding your first contact!</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Contact Modal -->
+<div class="modal fade" id="addContactModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Contact</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addContactForm">
+                    <div class="mb-3">
+                        <label for="picture" class="form-label">Picture URL (Optional)</label>
+                        <input type="text" class="form-control" id="picture"
+                               placeholder="https://example.com/avatar.jpg">
+                        <div class="form-text">Leave empty for a default avatar based on the name</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Name *</label>
+                        <input type="text" class="form-control" id="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="address" class="form-label">Address *</label>
+                        <textarea class="form-control" id="address" rows="3" required></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="addContact()">Add Contact</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Contact Modal -->
+<div class="modal fade" id="editContactModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Contact</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editContactForm">
+                    <input type="hidden" id="editId">
+                    <div class="mb-3">
+                        <label for="editPicture" class="form-label">Picture URL</label>
+                        <input type="text" class="form-control" id="editPicture">
+                    </div>
+                    <div class="mb-3">
+                        <label for="editName" class="form-label">Name *</label>
+                        <input type="text" class="form-control" id="editName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editAddress" class="form-label">Address *</label>
+                        <textarea class="form-control" id="editAddress" rows="3" required></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="updateContact()">Update Contact</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bootstrap & jQuery -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<!-- JavaScript for AJAX operations -->
+<script>
+
+    // Update document ready
+    $(document).ready(function() {
+        setupFormValidation();
+        checkAuthState(); // Check authentication state first
+
+        // Check for logout success message
+        const urlParams = new URLSearchParams(window.location.search);
+    });
+
+    // Global variable to track authentication state
+    let isAuthenticated = false;
+    let currentUsername = '';
+    let currentSearchQuery = '';
+    let searchTimeout = null;
+
+    // Authentication functions
+    function checkAuthState() {
+        $.ajax({
+            url: '/api/auth/current-user',
+            type: 'GET',
+            success: function(userInfo) {
+                isAuthenticated = userInfo.authenticated === 'true';
+                currentUsername = userInfo.username || '';
+                updateNavigation(userInfo);
+                updateUIForAuthState();
+            },
+            error: function() {
+                isAuthenticated = false;
+                currentUsername = '';
+                updateNavigation({ authenticated: false });
+                updateUIForAuthState();
+            }
+        });
+    }
+
+    function updateUIForAuthState() {
+        const addContactBtn = $('button[data-bs-target="#addContactModal"]');
+        const exportCsvBtn = $('button:contains("Export CSV")');
+
+        if (isAuthenticated) {
+            // User is logged in - enable management features
+            addContactBtn.prop('disabled', false);
+            exportCsvBtn.prop('disabled', false);
+            addContactBtn.html('<i class="fas fa-plus me-1"></i> Add Contact');
+            $('#pageTitle').html('Public Address Book');
+
+            // Remove public access info if present
+            $('.public-access-info').alert('close');
+
+        } else {
+            // User is not logged in - disable management features
+            addContactBtn.prop('disabled', true);
+            //exportCsvBtn.prop('disabled', true);
+            addContactBtn.html('<i class="fas fa-lock me-1"></i> Login to Add Contacts');
+            $('#pageTitle').text('Public Address Book');
+        }
+
+        // Always load contacts (public view)
+        loadContacts();
+    }
+
+    function showLoginPrompt() {
+        const container = $('#contactsContainer');
+        container.html(`
+        <div class="col-12">
+            <div class="empty-state">
+                <i class="fas fa-lock fa-3x mb-3 text-muted"></i>
+                <h4>Authentication Required</h4>
+                <p>Please log in to view and manage your contacts</p>
+                <div class="mt-3">
+                    <a href="/login" class="btn btn-primary me-2">
+                        <i class="fas fa-sign-in-alt me-1"></i> Login
+                    </a>
+                    <a href="/signup" class="btn btn-outline-primary">
+                        <i class="fas fa-user-plus me-1"></i> Sign Up
+                    </a>
+                </div>
+            </div>
+        </div>
+    `);
+    }
+
+    function updateNavigation(userInfo) {
+        const authNav = $('#authNav');
+
+        if (userInfo.authenticated === 'true') {
+            // User is logged in
+            authNav.html(`
+            <div class="d-flex align-items-center">
+                <span class="navbar-text me-3">
+                    <i class="fas fa-user me-1"></i>Welcome, ${userInfo.username}!
+                </span>
+                <button class="btn btn-outline-light btn-sm" onclick="logout()">
+                    <i class="fas fa-sign-out-alt me-1"></i>Logout
+                </button>
+            </div>
+        `);
+        } else {
+            // User is not logged in
+            authNav.html(`
+            <div class="navbar-nav">
+                <a class="nav-link" href="/signup">
+                    <i class="fas fa-user-plus me-1"></i>Sign Up
+                </a>
+                <a class="nav-link" href="/login">
+                    <i class="fas fa-sign-in-alt me-1"></i>Login
+                </a>
+            </div>
+        `);
+        }
+    }
+
+    function logout() {
+        if (confirm('Are you sure you want to log out?')) {
+            window.location.href = '/api/auth/logout';
+        }
+    }
+
+
+    // Setup form validation
+    function setupFormValidation() {
+        // Add form validation
+        $('#addContactForm').on('submit', function(e) {
+            e.preventDefault();
+            addContact();
+        });
+
+        $('#editContactForm').on('submit', function(e) {
+            e.preventDefault();
+            updateContact();
+        });
+    }
+
+    // Handle search input with debouncing
+    function handleSearch() {
+        const searchTerm = $('#searchInput').val().trim();
+
+        // Clear previous timeout
+        if (searchTimeout) {
+            clearTimeout(searchTimeout);
+        }
+
+        // Set new timeout for debouncing (300ms delay)
+        searchTimeout = setTimeout(() => {
+            performSearch(searchTerm);
+        }, 300);
+    }
+
+    // Update search function to use public endpoint
+    function performSearch(searchTerm) {
+        currentSearchQuery = searchTerm;
+
+        if (searchTerm === '') {
+            // If search is empty, load all contacts
+            loadContacts();
+            $('#searchResultsCount').text('');
+        } else {
+            // Show loading state
+            const contactsContainer = $('#contactsContainer');
+            contactsContainer.html(`
+            <div class="col-12 text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Searching...</span>
+                </div>
+                <p class="mt-2">Searching for "${searchTerm}"...</p>
+            </div>
+        `);
+
+            // Perform search API call (always public)
+            $.ajax({
+                url: '/api/contacts/search',
+                type: 'GET',
+                data: { query: searchTerm },
+                success: function(contacts) {
+                    displayContacts(contacts);
+                    updateSearchResultsCount(contacts.length, searchTerm);
+                },
+                error: function(xhr) {
+                    showAlert('Error searching contacts: ' + getErrorMessage(xhr), 'danger');
+                    $('#searchResultsCount').text('');
+                }
+            });
+        }
+    }
+    // Update search results count
+    function updateSearchResultsCount(count, searchTerm) {
+        const countElement = $('#searchResultsCount');
+        if (count === 0) {
+            countElement.text('No contacts found');
+            countElement.removeClass('bg-success bg-warning').addClass('bg-warning');
+        } else if (count === 1) {
+            countElement.text('1 contact found');
+            countElement.removeClass('bg-warning bg-secondary').addClass('bg-success');
+        } else {
+            countElement.text(`${count} contacts found`);
+            countElement.removeClass('bg-warning bg-secondary').addClass('bg-success');
+        }
+    }
+
+    // Clear search
+    function clearSearch() {
+        $('#searchInput').val('');
+        currentSearchQuery = '';
+        $('#searchResultsCount').text('');
+        loadContacts();
+    }
+
+    // Load contacts based on authentication state
+    function loadContacts() {
+        let url = '/api/contacts'; // Always public endpoint
+
+        $.ajax({
+            url: url,
+            type: 'GET',
+            success: function(contacts) {
+                displayContacts(contacts);
+            },
+            error: function(xhr) {
+                showAlert('Error loading contacts: ' + getErrorMessage(xhr), 'danger');
+            }
+        });
+    }
+
+    // Update the displayContacts function to properly show ownership
+    function displayContacts(contacts) {
+        const container = $('#contactsContainer');
+        const emptyState = $('#emptyState');
+
+        if (contacts.length === 0) {
+            if (currentSearchQuery) {
+                // No results for search
+                container.html(`
+                <div class="col-12">
+                    <div class="empty-state">
+                        <i class="fas fa-search fa-3x mb-3"></i>
+                        <h4>No contacts found</h4>
+                        <p>No contacts match your search for "<strong>${currentSearchQuery}</strong>"</p>
+                        <button class="btn btn-primary" onclick="clearSearch()">
+                            <i class="fas fa-times me-1"></i> Clear Search
+                        </button>
+                    </div>
+                </div>
+            `);
+            } else {
+                // No contacts at all
+                container.html(`
+                <div class="col-12">
+                    <div class="empty-state">
+                        <i class="fas fa-address-book fa-3x mb-3"></i>
+                        <h4>No contacts yet</h4>
+                        <p>The address book is empty. ${isAuthenticated ? 'Add the first contact!' : 'Sign up to add the first contact!'}</p>
+                        ${!isAuthenticated ? `
+                            <div class="mt-3">
+                                <a href="/signup" class="btn btn-primary">
+                                    <i class="fas fa-user-plus me-1"></i> Sign Up to Add Contacts
+                                </a>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `);
+            }
+            return;
+        }
+
+        emptyState.hide();
+
+        let html = '';
+        contacts.forEach(contact => {
+            const weatherInfo = contact.weather ? `
+                <div class="weather-info mt-2 p-2 bg-light rounded">
+                    <small class="text-muted">
+                        <i class="wi wi-day-sunny me-1"></i>
+                        Weather: ${contact.weather.condition}, ${contact.weather.temperature}
+                    </small>
+                </div>
+            ` : '';
+            const avatarUrl = contact.picture || 'https://via.placeholder.com/80x80/007bff/ffffff?text=' + (contact.name ? contact.name.charAt(0) : '?');
+
+            // Highlight search term in results
+            let highlightedName = contact.name;
+            if (currentSearchQuery) {
+                const regex = new RegExp(`(${currentSearchQuery})`, 'gi');
+                highlightedName = contact.name.replace(regex, '<mark>$1</mark>');
+            }
+
+// In the displayContacts function, update the contact.user references:
+            const ownerInfo = contact.ownerUsername ?
+                `<small class="text-muted"><i class="fas fa-user me-1"></i>Added by ${contact.ownerUsername}</small>` : '';
+
+            // Check if current user owns this contact
+            const isOwnContact = isAuthenticated && contact.ownerUsername === currentUsername;
+
+            // Action buttons based on authentication and ownership
+            let actionButtons = '';
+            if (isAuthenticated) {
+                if (isOwnContact) {
+                    // User owns this contact - show full actions
+                    actionButtons = `
+                    <div class="btn-group w-100">
+                        <button class="btn btn-outline-primary btn-sm" onclick="openEditModal(${contact.id})">
+                            <i class="fas fa-edit"></i> Edit
+                        </button>
+                        <button class="btn btn-outline-danger btn-sm" onclick="deleteContact(${contact.id})">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                    </div>
+                `;
+                } else {
+                    // Contact belongs to another user - show view only
+                    actionButtons = `
+                    <div class="text-center">
+                        <small class="text-muted">
+                            <i class="fas fa-eye me-1"></i>View only
+                        </small>
+                    </div>
+                `;
+                }
+            } else {
+                // Public view - no actions
+                actionButtons = `
+                <div class="text-center">
+                    <small class="text-muted">
+                        <i class="fas fa-lock me-1"></i>Login to manage
+                    </small>
+                </div>
+            `;
+            }
+
+            // Add a border or background for user's own contacts
+            const cardClass = isOwnContact ? 'border-primary' : '';
+
+            // Include weatherInfo in the card HTML:
+                        html += `
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card contact-card h-100 ${cardClass}">
+                        ${isOwnContact ? '<div class="card-header bg-primary bg-opacity-10 py-1"><small><i class="fas fa-star me-1"></i>Your contact</small></div>' : ''}
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-4">
+                                    <img src="${avatarUrl}" alt="${contact.name}" class="contact-avatar"
+                                         onerror="this.src='https://via.placeholder.com/80x80/6c757d/ffffff?text=?'">
+                                </div>
+                                <div class="col-8">
+                                    <h5 class="card-title">${highlightedName}</h5>
+                                    <p class="card-text text-muted small">
+                                        <i class="fas fa-map-marker-alt me-1"></i>
+                                        ${contact.address}
+                                    </p>
+                                    ${ownerInfo}
+                                    ${weatherInfo}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-footer bg-transparent">
+                            ${actionButtons}
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        container.html(html);
+    }
+
+    // Update other functions to maintain search state after operations
+    function addContact() {
+        if (!isAuthenticated) {
+            showAlert('Please log in to add contacts', 'warning');
+            return;
+        }
+
+        const contact = {
+            picture: $('#picture').val().trim(),
+            name: $('#name').val().trim(),
+            address: $('#address').val().trim()
+        };
+
+        // Client-side validation
+        if (!validateContact(contact)) {
+            return;
+        }
+
+        $.ajax({
+            url: '/api/contacts',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(contact),
+            success: function() {
+                $('#addContactModal').modal('hide');
+                $('#addContactForm')[0].reset();
+                // After adding, reload based on current search state
+                if (currentSearchQuery) {
+                    performSearch(currentSearchQuery);
+                } else {
+                    loadContacts();
+                }
+                showAlert('Contact added successfully!', 'success');
+            },
+            error: function(xhr) {
+                showAlert('Error adding contact: ' + getErrorMessage(xhr), 'danger');
+            }
+        });
+    }
+
+    // Open edit modal with contact data
+    function openEditModal(id) {
+        $.ajax({
+            url: '/api/contacts/' + id,
+            type: 'GET',
+            success: function(contact) {
+                $('#editId').val(contact.id);
+                $('#editPicture').val(contact.picture || '');
+                $('#editName').val(contact.name);
+                $('#editAddress').val(contact.address);
+                $('#editContactModal').modal('show');
+            },
+            error: function(xhr) {
+                showAlert('Error loading contact: ' + getErrorMessage(xhr), 'danger');
+            }
+        });
+    }
+
+    // Similarly update updateContact and deleteContact to maintain search state
+    function updateContact() {
+        if (!isAuthenticated) {
+            showAlert('Please log in to edit contacts', 'warning');
+            return;
+        }
+
+        const id = $('#editId').val();
+        const contact = {
+            picture: $('#editPicture').val().trim(),
+            name: $('#editName').val().trim(),
+            address: $('#editAddress').val().trim()
+        };
+
+        // Client-side validation
+        if (!validateContact(contact)) {
+            return;
+        }
+
+        $.ajax({
+            url: '/api/contacts/' + id,
+            type: 'PUT',
+            contentType: 'application/json',
+            data: JSON.stringify(contact),
+            success: function() {
+                $('#editContactModal').modal('hide');
+                // After updating, reload based on current search state
+                if (currentSearchQuery) {
+                    performSearch(currentSearchQuery);
+                } else {
+                    loadContacts();
+                }
+                showAlert('Contact updated successfully!', 'success');
+            },
+            error: function(xhr) {
+                showAlert('Error updating contact: ' + getErrorMessage(xhr), 'danger');
+            }
+        });
+    }
+
+    // Delete contact
+    function deleteContact(id) {
+        if (!isAuthenticated) {
+            showAlert('Please log in to delete contacts', 'warning');
+            return;
+        }
+
+        if (confirm('Are you sure you want to delete this contact?')) {
+            $.ajax({
+                url: '/api/contacts/' + id,
+                type: 'DELETE',
+                success: function() {
+                    // After deleting, reload based on current search state
+                    if (currentSearchQuery) {
+                        performSearch(currentSearchQuery);
+                    } else {
+                        loadContacts();
+                    }
+                    showAlert('Contact deleted successfully!', 'success');
+                },
+                error: function(xhr) {
+                    showAlert('Error deleting contact: ' + getErrorMessage(xhr), 'danger');
+                }
+            });
+        }
+    }
+    // Export contacts to CSV
+    function exportToCsv() {
+        // Show loading state
+
+        const exportBtn = $('button:contains("Export CSV")');
+        const originalText = exportBtn.html();
+        exportBtn.html('<i class="fas fa-spinner fa-spin me-1"></i> Exporting...');
+        exportBtn.prop('disabled', true);
+
+        // Create a hidden link to trigger download
+        const link = document.createElement('a');
+        link.href = '/api/contacts/export/csv';
+
+        link.style.display = 'none';
+        document.body.appendChild(link);
+
+        // Trigger download
+        link.click();
+
+        // Clean up
+        document.body.removeChild(link);
+
+        // Reset button after a short delay
+        setTimeout(() => {
+            exportBtn.html(originalText);
+            exportBtn.prop('disabled', false);
+            showAlert('CSV export started successfully!', 'success');
+        }, 1000);
+    }
+
+    // Validate contact data
+    function validateContact(contact) {
+        if (!contact.picture || contact.picture.trim() === '') {
+            // Provide a default picture based on the name
+            contact.picture = 'https://via.placeholder.com/80x80/007bff/ffffff?text=' +
+                (contact.name ? contact.name.charAt(0).toUpperCase() : '?');
+        }
+        if (!contact.name || contact.name.trim() === '') {
+            showAlert('Please enter a name', 'warning');
+            return false;
+        }
+        if (!contact.address || contact.address.trim() === '') {
+            showAlert('Please enter an address', 'warning');
+            return false;
+        }
+        return true;
+    }
+
+    // Extract error message from response
+    function getErrorMessage(xhr) {
+        try {
+            const response = JSON.parse(xhr.responseText);
+            return response.message || response || 'Unknown error occurred';
+        } catch (e) {
+            return xhr.responseText || 'Unknown error occurred';
+        }
+    }
+
+    // Show alert message
+    function showAlert(message, type) {
+        // Remove existing alerts
+        $('.alert').alert('close');
+
+        const alertHtml = `
+            <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+        $('.container').prepend(alertHtml);
+
+        // Auto remove alert after 5 seconds
+        setTimeout(() => {
+            $('.alert').alert('close');
+        }, 5000);
+    }
+
+    // Clear form when modal is closed
+    $('#addContactModal').on('hidden.bs.modal', function() {
+        $('#addContactForm')[0].reset();
+        $('.alert').alert('close');
+    });
+
+    $('#editContactModal').on('hidden.bs.modal', function() {
+        $('.alert').alert('close');
+    });
+</script>
+</body>
+</html>
