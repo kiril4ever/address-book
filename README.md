@@ -28,7 +28,7 @@
    ```bash
    git clone https://github.com/kiril4ever/address-book.git
    cd address-book
-   docker-compose up --build -d
+   docker-compose up -d
    # Build the application
     mvn clean package
    # Run from IntelliJ or command line
